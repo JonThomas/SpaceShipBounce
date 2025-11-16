@@ -1,3 +1,4 @@
+
 export interface Spaceship {
   x: number;
   y: number;
@@ -8,11 +9,33 @@ export interface Spaceship {
   radius: number; // collision radius
   maxSpeed: number; // maximum speed magnitude for HUD scaling & gameplay
   currentSpeed: number; // cached speed magnitude after clamping each update
+  setPositionAndVelocity: (x: number, y: number, vx: number, vy: number) => void;
+  shouldRenderFlame: () => boolean;
 }
 
 export function createInitialShip(x: number, y: number): Spaceship {
   // Ship is initialized at world center and moves in world coordinates.
-  return { x, y, vx: 0, vy: 0, angle: 0, thrusting: false, radius: 10, maxSpeed: 500, currentSpeed: 0 };
+  const ship: Spaceship = {
+    x,
+    y,
+    vx: 0,
+    vy: 0,
+    angle: 0,
+    thrusting: false,
+    radius: 10,
+    maxSpeed: 500,
+    currentSpeed: 0,
+    setPositionAndVelocity: function (newX: number, newY: number, newVx: number, newVy: number) {
+      this.x = newX;
+      this.y = newY;
+      this.vx = newVx;
+      this.vy = newVy;
+    },
+    shouldRenderFlame: function () {
+      return this.thrusting && this.currentSpeed < this.maxSpeed;
+    }
+  };
+  return ship;
 }
 
 interface KeysState { up: boolean; left: boolean; right: boolean; }
@@ -23,9 +46,7 @@ const ROT_SPEED = Math.PI; // radians per second
 const RESTITUTION = 0.4; // bounce energy retention
 const FRICTION = 0.85; // tangential velocity retention
 
-import { Terrain, isCollidingWithTerrain, closestSegmentInfo, pointOutsideTerrain } from './terrain';
-
-export function updateShip(ship: Spaceship, dt: number, keys: KeysState, terrain: Terrain, worldWidth = 900, worldHeight = 600) {
+export function updateShip(ship: Spaceship, dt: number, keys: KeysState) {
   // Handle rotation input
   if (keys.left) {
     ship.angle -= ROT_SPEED * dt;
@@ -49,25 +70,6 @@ export function updateShip(ship: Spaceship, dt: number, keys: KeysState, terrain
   ship.x += ship.vx * dt;
   ship.y += ship.vy * dt;
 
-  // Remove horizontal wrapping; enclosure handles boundaries.
-
-  // Terrain enclosure collision & bounce
-  if (isCollidingWithTerrain(ship.x, ship.y, ship.radius, terrain)) {
-    const info = closestSegmentInfo({ x: ship.x, y: ship.y }, terrain);
-    // Move ship slightly inward along normal (inside is opposite of outward normal)
-    // Determine if actually outside; if outside, push inside.
-    if (pointOutsideTerrain({ x: ship.x, y: ship.y }, terrain)) {
-      // Project center to projection point minus radius along outward normal
-      ship.x = info.px - info.nx * ship.radius;
-      ship.y = info.py - info.ny * ship.radius;
-    }
-    const normalVelocity = ship.vx * info.nx + ship.vy * info.ny;
-    ship.vx = ship.vx - (1 + RESTITUTION) * normalVelocity * info.nx;
-    ship.vy = ship.vy - (1 + RESTITUTION) * normalVelocity * info.ny;
-    ship.vx *= FRICTION;
-    ship.vy *= FRICTION;
-  }
-
   // Limit speed to max speed (reduce if needed)
   ship.currentSpeed = Math.hypot(ship.vx, ship.vy);
   if (ship.currentSpeed >= ship.maxSpeed) {
@@ -76,16 +78,4 @@ export function updateShip(ship: Spaceship, dt: number, keys: KeysState, terrain
     ship.vy *= scale;
   }
 
-  // Limit to canvas just in case (should not reach due to enclosure)
-  if (ship.x < 0) { ship.x = 0; ship.vx = Math.abs(ship.vx) * 0.5; }
-  if (ship.x > worldWidth) { ship.x = worldWidth; ship.vx = -Math.abs(ship.vx) * 0.5; }
-  if (ship.y < 0) { ship.y = 0; ship.vy = Math.abs(ship.vy) * 0.5; }
-  if (ship.y > worldHeight) { ship.y = worldHeight; ship.vy = -Math.abs(ship.vy) * 0.5; }
-}
-
-// Determines whether the thruster flame should be rendered.
-// Flame is visible only while thrusting AND current speed magnitude is below maxSpeed.
-// This communicates to the player that further acceleration is occurring.
-export function shouldRenderFlame(ship: Spaceship): boolean {
-  return ship.thrusting && ship.currentSpeed < ship.maxSpeed;
 }

@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Spaceship, createInitialShip, updateShip, shouldRenderFlame } from '../game/spaceship';
+import { Spaceship, createInitialShip, updateShip } from '../game/spaceship';
 import { Terrain, generateTerrain } from '../game/terrain';
 import { drawHUD } from '../game/hud';
+import { handleWindowSizeChange, RenderAssetsOptions } from './hooks/handleWindowSizeChange';
+import { gameLoop, ShipGameLoopOptions } from './hooks/gameLoop';
 
 // No props needed, will use window size
 
@@ -33,6 +35,11 @@ export const GameCanvas: React.FC = () => {
   const terrainRef = useRef<Terrain>(generateTerrain(WORLD_WIDTH, WORLD_HEIGHT));
   const keysRef = useRef<KeysState>({ up: false, left: false, right: false });
   const lastTimeRef = useRef<number | null>(null);
+  const accumulatorRef = useRef<number>(0);
+  const prevShipPosRef = useRef<{x:number;y:number}>({ x: shipRef.current.x, y: shipRef.current.y });
+  const terrainPathRef = useRef<Path2D | null>(null);
+  const gradientRef = useRef<CanvasGradient | null>(null);
+  const starCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -53,22 +60,35 @@ export const GameCanvas: React.FC = () => {
     };
   }, []);
 
-  useEffect(() => {
-    const ctx = canvasRef.current?.getContext('2d');
-    if (!ctx) return;
+  // Prepare static rendering assets when browser window size change
+  const renderAssetsOptions: RenderAssetsOptions = {
+    windowSize,
+    worldWidth: WORLD_WIDTH,
+    worldHeight: WORLD_HEIGHT,
+    terrainRef,
+    canvasRef,
+    terrainPathRef,
+    gradientRef,
+    starCanvasRef
+  };
+  handleWindowSizeChange(renderAssetsOptions);
 
-    const loop = (time: number) => {
-      if (lastTimeRef.current == null) lastTimeRef.current = time;
-      const dt = (time - lastTimeRef.current) / 1000; // seconds
-      lastTimeRef.current = time;
-
-      updateShip(shipRef.current, dt, keysRef.current, terrainRef.current, WORLD_WIDTH, WORLD_HEIGHT);
-      draw(ctx, shipRef.current, terrainRef.current, WORLD_WIDTH, WORLD_HEIGHT);
-
-      requestAnimationFrame(loop);
-    };
-    requestAnimationFrame(loop);
-  }, [windowSize]); // rerun effect if window size changes
+  // Start game loop (fixed timestep physics + interpolated rendering) when mounted / size changes.
+  const gameLoopOptions: ShipGameLoopOptions = {
+    windowSize,
+    canvasRef,
+    lastTimeRef,
+    accumulatorRef,
+    prevShipPosRef,
+    shipRef,
+    keysRef,
+    terrainRef,
+    starCanvasRef,
+    terrainPathRef,
+    gradientRef,
+    draw
+  };
+  gameLoop(gameLoopOptions);
 
   return <canvas
     ref={canvasRef}
@@ -79,70 +99,50 @@ export const GameCanvas: React.FC = () => {
 };
 
 
-function draw(ctx: CanvasRenderingContext2D, ship: Spaceship, terrain: Terrain, worldWidth: number, worldHeight: number) {
+function draw(
+  ctx: CanvasRenderingContext2D,
+  ship: Spaceship,
+  terrain: Terrain,
+  renderX: number,
+  renderY: number,
+  starCanvas: HTMLCanvasElement | null,
+  terrainPath: Path2D | null,
+  gradient: CanvasGradient | null
+) {
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-
-  // Background stars (simple)
+  // Starfield prerender
+  // (We rely on starCanvasRef via closure; TypeScript allows any here)
+  if (starCanvas) {
+    ctx.drawImage(starCanvas, 0, 0);
+  }
+  // Offset for terrain based on interpolated position
+  const offsetX = ctx.canvas.width * 0.5 - renderX;
+  const offsetY = ctx.canvas.height * 0.5 - renderY;
   ctx.save();
-  ctx.fillStyle = '#081421';
-  ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  ctx.fillStyle = '#ffffff22';
-  // Draw background stars
-  const STAR_COUNT = 120;
-  const STAR_X_FACTOR = 73;
-  const STAR_Y_FACTOR = 157;
-  for (let starIndex = 0; starIndex < STAR_COUNT; starIndex++) {
-    const starX = (starIndex * STAR_X_FACTOR) % ctx.canvas.width;
-    const starY = (starIndex * STAR_Y_FACTOR) % ctx.canvas.height;
-    ctx.fillRect(starX, starY, 2, 2);
+  ctx.translate(offsetX, offsetY);
+  if (terrainPath) {
+    ctx.fillStyle = gradient || '#1d3b4d';
+    ctx.fill(terrainPath);
+    ctx.strokeStyle = '#3b6b8b';
+    ctx.lineWidth = 3;
+    ctx.stroke(terrainPath);
   }
   ctx.restore();
-
-  // Calculate offset so ship is always in center of canvas
-  const offsetX = ctx.canvas.width * 0.5 - ship.x;
-  const offsetY = ctx.canvas.height * 0.5 - ship.y;
-
-  // Terrain
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(terrain.points[0].x + offsetX, terrain.points[0].y + offsetY);
-  for (let terrainIndex = 1; terrainIndex < terrain.points.length; terrainIndex++) {
-    ctx.lineTo(terrain.points[terrainIndex].x + offsetX, terrain.points[terrainIndex].y + offsetY);
-  }
-  ctx.closePath();
-  // Fill with gradient
-  const grad = ctx.createLinearGradient(0, 0, 0, ctx.canvas.height);
-  grad.addColorStop(0, '#1d3b4d');
-  grad.addColorStop(1, '#0b1e29');
-  ctx.fillStyle = grad;
-  ctx.fill();
-  ctx.strokeStyle = '#3b6b8b';
-  ctx.lineWidth = 3;
-  ctx.stroke();
-  ctx.restore();
-
-  // Ship (always in center)
+  // Ship (centered on screen with its own rotation)
   ctx.save();
   ctx.translate(ctx.canvas.width * 0.5, ctx.canvas.height * 0.5);
   ctx.rotate(ship.angle);
-  ctx.scale(1, 1);
-
-  // Body triangle pointing up (angle 0 means facing up)
   ctx.beginPath();
-  
-  // Draw ship triangle (nose, right, left)
-  ctx.moveTo(0, -12); // nose
-  ctx.lineTo(8, 10); // right
-  ctx.lineTo(-8, 10); // left
+  ctx.moveTo(0, -12);
+  ctx.lineTo(8, 10);
+  ctx.lineTo(-8, 10);
   ctx.closePath();
   ctx.fillStyle = '#cfe2f3';
   ctx.fill();
   ctx.strokeStyle = '#6aa0d3';
   ctx.lineWidth = 2;
   ctx.stroke();
-
-  // Draw thruster flame 
-  if (shouldRenderFlame(ship)) {
+  if (ship.shouldRenderFlame?.()) {
     ctx.beginPath();
     ctx.moveTo(0, 12);
     ctx.lineTo(4, 22);
@@ -153,7 +153,5 @@ function draw(ctx: CanvasRenderingContext2D, ship: Spaceship, terrain: Terrain, 
     ctx.fill();
   }
   ctx.restore();
-
-  // HUD
   drawHUD(ctx, ship);
 }
