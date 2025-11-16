@@ -8,7 +8,8 @@ interface KeysState { up: boolean; left: boolean; right: boolean; }
 
 export const GameCanvas: React.FC<GameCanvasProps> = ({ width, height }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const shipRef = useRef<Spaceship>(createInitialShip(width / 2, height / 4));
+  // Initialize ship inside central play area
+  const shipRef = useRef<Spaceship>(createInitialShip(width * 0.5, height * 0.5));
   const terrainRef = useRef<Terrain>(generateTerrain(width, height));
   const keysRef = useRef<KeysState>({ up: false, left: false, right: false });
   const lastTimeRef = useRef<number | null>(null);
@@ -72,15 +73,22 @@ function draw(ctx: CanvasRenderingContext2D, ship: Spaceship, terrain: Terrain) 
   ctx.restore();
 
   // Terrain
+  // Draw enclosed terrain boundary polygon
   ctx.save();
-  ctx.strokeStyle = '#3b6b8b';
-  ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.moveTo(terrain.points[0].x, terrain.points[0].y);
-  // Draw terrain outline
   for (let terrainIndex = 1; terrainIndex < terrain.points.length; terrainIndex++) {
     ctx.lineTo(terrain.points[terrainIndex].x, terrain.points[terrainIndex].y);
   }
+  ctx.closePath();
+  // Fill with gradient
+  const grad = ctx.createLinearGradient(0, 0, 0, ctx.canvas.height);
+  grad.addColorStop(0, '#1d3b4d');
+  grad.addColorStop(1, '#0b1e29');
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.strokeStyle = '#3b6b8b';
+  ctx.lineWidth = 3;
   ctx.stroke();
   ctx.restore();
 

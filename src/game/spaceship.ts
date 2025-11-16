@@ -20,7 +20,7 @@ const ROT_SPEED = Math.PI; // radians per second
 const RESTITUTION = 0.4; // bounce energy retention
 const FRICTION = 0.85; // tangential velocity retention
 
-import { Terrain, isCollidingWithTerrain, sampleTerrainHeight, terrainNormal } from './terrain';
+import { Terrain, isCollidingWithTerrain, closestSegmentInfo, pointOutsideTerrain } from './terrain';
 
 export function updateShip(ship: Spaceship, dt: number, keys: KeysState, terrain: Terrain, worldWidth = 900, worldHeight = 600) {
   // Handle rotation input
@@ -46,34 +46,28 @@ export function updateShip(ship: Spaceship, dt: number, keys: KeysState, terrain
   ship.x += ship.vx * dt;
   ship.y += ship.vy * dt;
 
-  // Horizontal wrap (for open playfield)
-  if (ship.x < 0) {
-    ship.x += worldWidth;
-  }
-  if (ship.x > worldWidth) {
-    ship.x -= worldWidth;
-  }
+  // Remove horizontal wrapping; enclosure handles boundaries.
 
-  // Terrain collision & bounce
+  // Terrain enclosure collision & bounce
   if (isCollidingWithTerrain(ship.x, ship.y, ship.radius, terrain)) {
-    // Move ship just above terrain
-    const terrainHeight = sampleTerrainHeight(terrain, ship.x) - ship.radius;
-    ship.y = terrainHeight;
-    // Compute terrain normal
-    const { nx, ny } = terrainNormal(terrain, ship.x);
-    // Velocity components
-    const normalVelocity = ship.vx * nx + ship.vy * ny;
-    // Reflect normal component
-    ship.vx = ship.vx - (1 + RESTITUTION) * normalVelocity * nx;
-    ship.vy = ship.vy - (1 + RESTITUTION) * normalVelocity * ny;
-    // Apply friction to tangential component
+    const info = closestSegmentInfo({ x: ship.x, y: ship.y }, terrain);
+    // Move ship slightly inward along normal (inside is opposite of outward normal)
+    // Determine if actually outside; if outside, push inside.
+    if (pointOutsideTerrain({ x: ship.x, y: ship.y }, terrain)) {
+      // Project center to projection point minus radius along outward normal
+      ship.x = info.px - info.nx * ship.radius;
+      ship.y = info.py - info.ny * ship.radius;
+    }
+    const normalVelocity = ship.vx * info.nx + ship.vy * info.ny;
+    ship.vx = ship.vx - (1 + RESTITUTION) * normalVelocity * info.nx;
+    ship.vy = ship.vy - (1 + RESTITUTION) * normalVelocity * info.ny;
     ship.vx *= FRICTION;
     ship.vy *= FRICTION;
   }
 
-  // Clamp to ceiling
-  if (ship.y < 0) {
-    ship.y = 0;
-    ship.vy = 0;
-  }
+  // Clamp to canvas just in case (should not reach due to enclosure)
+  if (ship.x < 0) { ship.x = 0; ship.vx = Math.abs(ship.vx) * 0.5; }
+  if (ship.x > worldWidth) { ship.x = worldWidth; ship.vx = -Math.abs(ship.vx) * 0.5; }
+  if (ship.y < 0) { ship.y = 0; ship.vy = Math.abs(ship.vy) * 0.5; }
+  if (ship.y > worldHeight) { ship.y = worldHeight; ship.vy = -Math.abs(ship.vy) * 0.5; }
 }
