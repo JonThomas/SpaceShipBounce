@@ -60,10 +60,14 @@ function draw(ctx: CanvasRenderingContext2D, ship: Spaceship, terrain: Terrain) 
   ctx.fillStyle = '#081421';
   ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   ctx.fillStyle = '#ffffff22';
-  for (let i = 0; i < 120; i++) {
-    const x = (i * 73) % ctx.canvas.width;
-    const y = (i * 157) % ctx.canvas.height;
-    ctx.fillRect(x, y, 2, 2);
+  // Draw background stars
+  const STAR_COUNT = 120;
+  const STAR_X_FACTOR = 73;
+  const STAR_Y_FACTOR = 157;
+  for (let starIndex = 0; starIndex < STAR_COUNT; starIndex++) {
+    const starX = (starIndex * STAR_X_FACTOR) % ctx.canvas.width;
+    const starY = (starIndex * STAR_Y_FACTOR) % ctx.canvas.height;
+    ctx.fillRect(starX, starY, 2, 2);
   }
   ctx.restore();
 
@@ -73,8 +77,9 @@ function draw(ctx: CanvasRenderingContext2D, ship: Spaceship, terrain: Terrain) 
   ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.moveTo(terrain.points[0].x, terrain.points[0].y);
-  for (let i = 1; i < terrain.points.length; i++) {
-    ctx.lineTo(terrain.points[i].x, terrain.points[i].y);
+  // Draw terrain outline
+  for (let terrainIndex = 1; terrainIndex < terrain.points.length; terrainIndex++) {
+    ctx.lineTo(terrain.points[terrainIndex].x, terrain.points[terrainIndex].y);
   }
   ctx.stroke();
   ctx.restore();
@@ -87,9 +92,10 @@ function draw(ctx: CanvasRenderingContext2D, ship: Spaceship, terrain: Terrain) 
 
   // Body triangle pointing up (angle 0 means facing up)
   ctx.beginPath();
+  // Draw ship triangle (nose, right, left)
   ctx.moveTo(0, -12); // nose
-  ctx.lineTo(8, 10);
-  ctx.lineTo(-8, 10);
+  ctx.lineTo(8, 10); // right
+  ctx.lineTo(-8, 10); // left
   ctx.closePath();
   ctx.fillStyle = '#cfe2f3';
   ctx.fill();
@@ -97,7 +103,7 @@ function draw(ctx: CanvasRenderingContext2D, ship: Spaceship, terrain: Terrain) 
   ctx.lineWidth = 2;
   ctx.stroke();
 
-  // Thruster flame when thrusting
+  // Draw thruster flame if thrusting
   if (ship.thrusting) {
     ctx.beginPath();
     ctx.moveTo(0, 12);

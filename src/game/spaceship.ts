@@ -23,45 +23,57 @@ const FRICTION = 0.85; // tangential velocity retention
 import { Terrain, isCollidingWithTerrain, sampleTerrainHeight, terrainNormal } from './terrain';
 
 export function updateShip(ship: Spaceship, dt: number, keys: KeysState, terrain: Terrain, worldWidth = 900, worldHeight = 600) {
-  // Rotation
-  if (keys.left) ship.angle -= ROT_SPEED * dt;
-  if (keys.right) ship.angle += ROT_SPEED * dt;
-
-  // Thrust
-  ship.thrusting = keys.up;
-  if (keys.up) {
-    ship.vx += Math.sin(ship.angle) * THRUST * dt; // sin because angle 0 is up
-    ship.vy += -Math.cos(ship.angle) * THRUST * dt; // negative cos for upward thrust
+  // Handle rotation input
+  if (keys.left) {
+    ship.angle -= ROT_SPEED * dt;
+  }
+  if (keys.right) {
+    ship.angle += ROT_SPEED * dt;
   }
 
-  // Gravity
+  // Handle thrust input
+  ship.thrusting = keys.up;
+  if (keys.up) {
+    // Apply thrust in ship's facing direction
+    ship.vx += Math.sin(ship.angle) * THRUST * dt;
+    ship.vy += -Math.cos(ship.angle) * THRUST * dt;
+  }
+
+  // Apply gravity
   ship.vy += GRAVITY * dt;
 
   // Integrate position
   ship.x += ship.vx * dt;
   ship.y += ship.vy * dt;
 
-  // Horizontal wrap
-  if (ship.x < 0) ship.x += worldWidth;
-  if (ship.x > worldWidth) ship.x -= worldWidth;
+  // Horizontal wrap (for open playfield)
+  if (ship.x < 0) {
+    ship.x += worldWidth;
+  }
+  if (ship.x > worldWidth) {
+    ship.x -= worldWidth;
+  }
 
   // Terrain collision & bounce
   if (isCollidingWithTerrain(ship.x, ship.y, ship.radius, terrain)) {
     // Move ship just above terrain
-    const height = sampleTerrainHeight(terrain, ship.x) - ship.radius;
-    ship.y = height;
-    // Compute normal
+    const terrainHeight = sampleTerrainHeight(terrain, ship.x) - ship.radius;
+    ship.y = terrainHeight;
+    // Compute terrain normal
     const { nx, ny } = terrainNormal(terrain, ship.x);
     // Velocity components
-    const dot = ship.vx * nx + ship.vy * ny;
+    const normalVelocity = ship.vx * nx + ship.vy * ny;
     // Reflect normal component
-    ship.vx = ship.vx - (1 + RESTITUTION) * dot * nx;
-    ship.vy = ship.vy - (1 + RESTITUTION) * dot * ny;
-    // Apply simple friction to tangential component (approx by scaling total velocity)
+    ship.vx = ship.vx - (1 + RESTITUTION) * normalVelocity * nx;
+    ship.vy = ship.vy - (1 + RESTITUTION) * normalVelocity * ny;
+    // Apply friction to tangential component
     ship.vx *= FRICTION;
     ship.vy *= FRICTION;
   }
 
-  // Ceiling clamp
-  if (ship.y < 0) { ship.y = 0; ship.vy = 0; }
+  // Clamp to ceiling
+  if (ship.y < 0) {
+    ship.y = 0;
+    ship.vy = 0;
+  }
 }
