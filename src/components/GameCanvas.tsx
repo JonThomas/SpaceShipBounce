@@ -1,18 +1,31 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Spaceship, createInitialShip, updateShip } from '../game/spaceship';
 import { Terrain, generateTerrain } from '../game/terrain';
 
-interface GameCanvasProps { width: number; height: number; }
+// No props needed, will use window size
 
 interface KeysState { up: boolean; left: boolean; right: boolean; }
 
-export const GameCanvas: React.FC<GameCanvasProps> = ({ width, height }) => {
+export const GameCanvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // Track window size
+  const [windowSize, setWindowSize] = useState<{ width: number; height: number }>({
+    width: window.innerWidth,
+    height: window.innerHeight
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Define a much larger world size
   const WORLD_SCALE = 4; // 4x the visible area
-  const WORLD_WIDTH = width * WORLD_SCALE;
-  const WORLD_HEIGHT = height * WORLD_SCALE;
+  const WORLD_WIDTH = windowSize.width * WORLD_SCALE;
+  const WORLD_HEIGHT = windowSize.height * WORLD_SCALE;
 
   // Initialize ship at center of world
   const shipRef = useRef<Spaceship>(createInitialShip(WORLD_WIDTH * 0.5, WORLD_HEIGHT * 0.5));
@@ -54,9 +67,14 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ width, height }) => {
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
-  }, []);
+  }, [windowSize]); // rerun effect if window size changes
 
-  return <canvas ref={canvasRef} width={width} height={height} />;
+  return <canvas
+    ref={canvasRef}
+    width={windowSize.width}
+    height={windowSize.height}
+    style={{ display: 'block', position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh' }}
+  />;
 };
 
 
