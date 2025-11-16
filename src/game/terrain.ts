@@ -3,8 +3,8 @@ export interface Terrain { points: Point[]; } // Points define a closed non-self
 
 // Simple scenic terrain using combined sine waves.
 export function generateTerrain(width: number, height: number): Terrain {
-  // Generate a smooth non-self-intersecting enclosure centered on screen.
-  // Shape: perturbed ellipse sampled CCW.
+  // Generate a smooth non-self-intersecting enclosure centered in world coordinates.
+  // Shape: perturbed ellipse sampled CCW. World size may be much larger than visible canvas.
   const points: Point[] = [];
   const CENTER_X = width * 0.5;
   const CENTER_Y = height * 0.5;

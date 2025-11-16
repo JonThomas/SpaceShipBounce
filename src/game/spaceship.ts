@@ -9,6 +9,7 @@ export interface Spaceship {
 }
 
 export function createInitialShip(x: number, y: number): Spaceship {
+  // Ship is initialized at world center and moves in world coordinates.
   return { x, y, vx: 0, vy: 0, angle: 0, thrusting: false, radius: 10 };
 }
 

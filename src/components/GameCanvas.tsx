@@ -8,9 +8,15 @@ interface KeysState { up: boolean; left: boolean; right: boolean; }
 
 export const GameCanvas: React.FC<GameCanvasProps> = ({ width, height }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  // Initialize ship inside central play area
-  const shipRef = useRef<Spaceship>(createInitialShip(width * 0.5, height * 0.5));
-  const terrainRef = useRef<Terrain>(generateTerrain(width, height));
+
+  // Define a much larger world size
+  const WORLD_SCALE = 4; // 4x the visible area
+  const WORLD_WIDTH = width * WORLD_SCALE;
+  const WORLD_HEIGHT = height * WORLD_SCALE;
+
+  // Initialize ship at center of world
+  const shipRef = useRef<Spaceship>(createInitialShip(WORLD_WIDTH * 0.5, WORLD_HEIGHT * 0.5));
+  const terrainRef = useRef<Terrain>(generateTerrain(WORLD_WIDTH, WORLD_HEIGHT));
   const keysRef = useRef<KeysState>({ up: false, left: false, right: false });
   const lastTimeRef = useRef<number | null>(null);
 
@@ -42,8 +48,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ width, height }) => {
       const dt = (time - lastTimeRef.current) / 1000; // seconds
       lastTimeRef.current = time;
 
-  updateShip(shipRef.current, dt, keysRef.current, terrainRef.current, ctx.canvas.width, ctx.canvas.height);
-      draw(ctx, shipRef.current, terrainRef.current);
+      updateShip(shipRef.current, dt, keysRef.current, terrainRef.current, WORLD_WIDTH, WORLD_HEIGHT);
+      draw(ctx, shipRef.current, terrainRef.current, WORLD_WIDTH, WORLD_HEIGHT);
 
       requestAnimationFrame(loop);
     };
@@ -53,7 +59,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ width, height }) => {
   return <canvas ref={canvasRef} width={width} height={height} />;
 };
 
-function draw(ctx: CanvasRenderingContext2D, ship: Spaceship, terrain: Terrain) {
+
+function draw(ctx: CanvasRenderingContext2D, ship: Spaceship, terrain: Terrain, worldWidth: number, worldHeight: number) {
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
   // Background stars (simple)
@@ -72,13 +79,16 @@ function draw(ctx: CanvasRenderingContext2D, ship: Spaceship, terrain: Terrain) 
   }
   ctx.restore();
 
+  // Calculate offset so ship is always in center of canvas
+  const offsetX = ctx.canvas.width * 0.5 - ship.x;
+  const offsetY = ctx.canvas.height * 0.5 - ship.y;
+
   // Terrain
-  // Draw enclosed terrain boundary polygon
   ctx.save();
   ctx.beginPath();
-  ctx.moveTo(terrain.points[0].x, terrain.points[0].y);
+  ctx.moveTo(terrain.points[0].x + offsetX, terrain.points[0].y + offsetY);
   for (let terrainIndex = 1; terrainIndex < terrain.points.length; terrainIndex++) {
-    ctx.lineTo(terrain.points[terrainIndex].x, terrain.points[terrainIndex].y);
+    ctx.lineTo(terrain.points[terrainIndex].x + offsetX, terrain.points[terrainIndex].y + offsetY);
   }
   ctx.closePath();
   // Fill with gradient
@@ -92,14 +102,15 @@ function draw(ctx: CanvasRenderingContext2D, ship: Spaceship, terrain: Terrain) 
   ctx.stroke();
   ctx.restore();
 
-  // Ship
+  // Ship (always in center)
   ctx.save();
-  ctx.translate(ship.x, ship.y);
+  ctx.translate(ctx.canvas.width * 0.5, ctx.canvas.height * 0.5);
   ctx.rotate(ship.angle);
   ctx.scale(1, 1);
 
   // Body triangle pointing up (angle 0 means facing up)
   ctx.beginPath();
+  
   // Draw ship triangle (nose, right, left)
   ctx.moveTo(0, -12); // nose
   ctx.lineTo(8, 10); // right
