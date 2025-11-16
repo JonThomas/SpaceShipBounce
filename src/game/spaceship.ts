@@ -6,11 +6,13 @@ export interface Spaceship {
   angle: number; // radians, 0 = up
   thrusting: boolean;
   radius: number; // collision radius
+  maxSpeed: number; // maximum speed magnitude for HUD scaling & gameplay
+  currentSpeed: number; // cached speed magnitude after clamping each update
 }
 
 export function createInitialShip(x: number, y: number): Spaceship {
   // Ship is initialized at world center and moves in world coordinates.
-  return { x, y, vx: 0, vy: 0, angle: 0, thrusting: false, radius: 10 };
+  return { x, y, vx: 0, vy: 0, angle: 0, thrusting: false, radius: 10, maxSpeed: 500, currentSpeed: 0 };
 }
 
 interface KeysState { up: boolean; left: boolean; right: boolean; }
@@ -66,9 +68,24 @@ export function updateShip(ship: Spaceship, dt: number, keys: KeysState, terrain
     ship.vy *= FRICTION;
   }
 
-  // Clamp to canvas just in case (should not reach due to enclosure)
+  // Limit speed to max speed (reduce if needed)
+  ship.currentSpeed = Math.hypot(ship.vx, ship.vy);
+  if (ship.currentSpeed >= ship.maxSpeed) {
+    const scale = ship.maxSpeed / ship.currentSpeed;
+    ship.vx *= scale;
+    ship.vy *= scale;
+  }
+
+  // Limit to canvas just in case (should not reach due to enclosure)
   if (ship.x < 0) { ship.x = 0; ship.vx = Math.abs(ship.vx) * 0.5; }
   if (ship.x > worldWidth) { ship.x = worldWidth; ship.vx = -Math.abs(ship.vx) * 0.5; }
   if (ship.y < 0) { ship.y = 0; ship.vy = Math.abs(ship.vy) * 0.5; }
   if (ship.y > worldHeight) { ship.y = worldHeight; ship.vy = -Math.abs(ship.vy) * 0.5; }
+}
+
+// Determines whether the thruster flame should be rendered.
+// Flame is visible only while thrusting AND current speed magnitude is below maxSpeed.
+// This communicates to the player that further acceleration is occurring.
+export function shouldRenderFlame(ship: Spaceship): boolean {
+  return ship.thrusting && ship.currentSpeed < ship.maxSpeed;
 }

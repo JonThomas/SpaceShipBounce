@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Spaceship, createInitialShip, updateShip } from '../game/spaceship';
+import { Spaceship, createInitialShip, updateShip, shouldRenderFlame } from '../game/spaceship';
 import { Terrain, generateTerrain } from '../game/terrain';
+import { drawHUD } from '../game/hud';
 
 // No props needed, will use window size
 
@@ -140,8 +141,8 @@ function draw(ctx: CanvasRenderingContext2D, ship: Spaceship, terrain: Terrain, 
   ctx.lineWidth = 2;
   ctx.stroke();
 
-  // Draw thruster flame if thrusting
-  if (ship.thrusting) {
+  // Draw thruster flame 
+  if (shouldRenderFlame(ship)) {
     ctx.beginPath();
     ctx.moveTo(0, 12);
     ctx.lineTo(4, 22);
@@ -153,11 +154,6 @@ function draw(ctx: CanvasRenderingContext2D, ship: Spaceship, terrain: Terrain, 
   }
   ctx.restore();
 
-  // Simple HUD
-  ctx.save();
-  ctx.fillStyle = '#b8ccd9';
-  ctx.font = '14px monospace';
-  ctx.fillText(`Vel: ${ship.vx.toFixed(2)}, ${ship.vy.toFixed(2)}`, 10, 20);
-  ctx.fillText(`Angle: ${(ship.angle * 180 / Math.PI).toFixed(1)}°`, 10, 40);
-  ctx.restore();
+  // HUD
+  drawHUD(ctx, ship);
 }
