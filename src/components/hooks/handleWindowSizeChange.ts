@@ -13,7 +13,6 @@ export interface RenderAssetsOptions {
 }
 
 /**
- * useRenderAssets
  * Prepares terrain path, gradient, and starfield canvas when window size or world dimensions change.
  */
 export function handleWindowSizeChange(options: RenderAssetsOptions) {

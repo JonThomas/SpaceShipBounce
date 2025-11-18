@@ -9,34 +9,22 @@ const FRICTION = 0.85; // tangential velocity retention
 
 export interface CollisionResult {
   collided: boolean;
-  newValues?: {
-    x: number;
-    y: number;
-    vx: number;
-    vy: number;
-  };
+  exploded: boolean;
 }
 
 // Handles collision detection and response for a spaceship against terrain
+// Now triggers explosion instead of bounce
 export function handleShipTerrainCollision(ship: Spaceship, terrain: Terrain): CollisionResult {
-  if (!isCollidingWithTerrain(ship.x, ship.y, ship.radius, terrain)) {
-    return { collided: false };
+  // Skip collision if ship is already exploded
+  if (ship.isExploded) {
+    return { collided: false, exploded: false };
   }
-  const info = closestSegmentInfo({ x: ship.x, y: ship.y }, terrain);
-  let x = ship.x;
-  let y = ship.y;
-  let vx = ship.vx;
-  let vy = ship.vy;
-  if (pointOutsideTerrain({ x, y }, terrain)) {
-    // Project center to projection point minus radius along outward normal
-    x = info.px - info.nx * ship.radius;
-    y = info.py - info.ny * ship.radius;
-  }
-  const normalVelocity = vx * info.nx + vy * info.ny;
-  vx = vx - (1 + RESTITUTION) * normalVelocity * info.nx;
-  vy = vy - (1 + RESTITUTION) * normalVelocity * info.ny;
-  vx *= FRICTION;
-  vy *= FRICTION;
 
-  return { collided: true, newValues: { x, y, vx, vy } };
+  if (!isCollidingWithTerrain(ship.x, ship.y, ship.radius, terrain)) {
+    return { collided: false, exploded: false };
+  }
+
+  // Collision detected - explode the ship
+  ship.explode();
+  return { collided: true, exploded: true };
 }

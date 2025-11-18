@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Spaceship, createInitialShip } from '../../game/spaceship';
+import { Spaceship, createInitialShip, drawExplosion } from '../../game/spaceship';
 import { Terrain } from '../../game/terrain';
 import { handleShipTerrainCollision } from '../../game/collision';
 import { updateShip } from '../../game/spaceship';
@@ -73,30 +73,38 @@ export function useGameLoop(options: GameLoopOptions) {
         ctx.stroke(terrainPathRef.current);
       }
       ctx.restore();
-      ctx.save();
-      ctx.translate(ctx.canvas.width * 0.5, ctx.canvas.height * 0.5);
-      ctx.rotate(ship.angle);
-      ctx.beginPath();
-      ctx.moveTo(0, -12);
-      ctx.lineTo(8, 10);
-      ctx.lineTo(-8, 10);
-      ctx.closePath();
-      ctx.fillStyle = '#cfe2f3';
-      ctx.fill();
-      ctx.strokeStyle = '#6aa0d3';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      if (ship.shouldRenderFlame?.()) {
+      
+      // Render ship or explosion
+      if (!ship.isExploded) {
+        ctx.save();
+        ctx.translate(ctx.canvas.width * 0.5, ctx.canvas.height * 0.5);
+        ctx.rotate(ship.angle);
         ctx.beginPath();
-        ctx.moveTo(0, 12);
-        ctx.lineTo(4, 22);
-        ctx.lineTo(0, 18);
-        ctx.lineTo(-4, 22);
+        ctx.moveTo(0, -12);
+        ctx.lineTo(8, 10);
+        ctx.lineTo(-8, 10);
         ctx.closePath();
-        ctx.fillStyle = '#ff9f1c';
+        ctx.fillStyle = '#cfe2f3';
         ctx.fill();
+        ctx.strokeStyle = '#6aa0d3';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        if (ship.shouldRenderFlame?.()) {
+          ctx.beginPath();
+          ctx.moveTo(0, 12);
+          ctx.lineTo(4, 22);
+          ctx.lineTo(0, 18);
+          ctx.lineTo(-4, 22);
+          ctx.closePath();
+          ctx.fillStyle = '#ff9f1c';
+          ctx.fill();
+        }
+        ctx.restore();
+      } else {
+        // Render explosion particles
+        drawExplosion(ctx, ship, offsetX, offsetY);
       }
-      ctx.restore();
+      
       drawHUD(ctx, ship);
     }
 
@@ -111,11 +119,15 @@ export function useGameLoop(options: GameLoopOptions) {
         prevShipPosRef.current.x = ship.x;
         prevShipPosRef.current.y = ship.y;
         updateShip(ship, FIXED_DT, keysRef.current);
-        const collisionResult = handleShipTerrainCollision(ship, terrainRef.current);
-        if (collisionResult.collided && collisionResult.newValues) {
-          const { x, y, vx, vy } = collisionResult.newValues;
-          ship.setPositionAndVelocity?.(x, y, vx, vy);
+        
+        // Handle terrain collision (explosion is triggered inside the function)
+        handleShipTerrainCollision(ship, terrainRef.current);
+        
+        // Reset ship after explosion duration (3 seconds)
+        if (ship.isExploded && ship.explosionTime >= 3) {
+          ship.reset(worldWidth * 0.5, worldHeight * 0.5);
         }
+        
         accumulatorRef.current -= FIXED_DT;
       }
       const alpha = accumulatorRef.current / FIXED_DT;

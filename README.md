@@ -16,13 +16,14 @@ A small React + Vite + TypeScript physics toy: pilot a tiny spacecraft under gra
 - Energy/fuel system (optional)
 
 ## Getting Started
-
 ```powershell
 npm install
 npm run dev
 ```
 
 Open the dev server URL (usually http://localhost:5173) in a browser.
+
+Developed and tested with npm version 11.3.0 and node version 24.2.0
 
 ## Controls
 - Arrow Up: Thrust
