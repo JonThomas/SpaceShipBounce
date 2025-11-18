@@ -145,13 +145,16 @@ export function closestSegmentInfo(p: Point, terrain: Terrain): { a: Point; b: P
 }
 
 export function isCollidingWithTerrain(x: number, y: number, radius: number, terrain: Terrain): boolean {
-  // Collision occurs if center is outside polygon OR penetrating segment within radius.
   const p: Point = { x, y };
+  
+  // If center is outside terrain, collision occurs
   if (pointOutsideTerrain(p, terrain)) {
     return true;
   }
-  // Also treat near-edge outside as collision (handled by outside test above).
-  return false;
+  
+  // Check if spaceship radius penetrates any terrain boundary
+  const closestSegment = closestSegmentInfo(p, terrain);
+  return closestSegment.dist < radius;
 }
 
 // Find a safe spawn position that avoids all terrain including islands
