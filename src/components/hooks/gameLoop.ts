@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { Spaceship, createInitialShip, drawExplosion } from '../../game/spaceship';
-import { Terrain, findSafeSpawnPosition } from '../../game/terrain';
+import { Terrain } from '../../game/terrain';
+import { findSafeSpawnPosition } from '../../game/collision';
 import { handleShipTerrainCollision } from '../../game/collision';
 import { updateShip } from '../../game/spaceship';
 import { drawHUD } from '../../game/hud';
