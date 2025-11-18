@@ -96,7 +96,7 @@ export function createInitialShip(x: number, y: number): Spaceship {
 interface KeysState { up: boolean; left: boolean; right: boolean; }
 
 const GRAVITY = 60; // px/s^2 downward
-const THRUST = 140; // acceleration magnitude px/s^2
+const THRUST = 400; // acceleration magnitude px/s^2
 const ROT_SPEED = Math.PI; // radians per second
 const EXPLOSION_DURATION = 3; // seconds
 
