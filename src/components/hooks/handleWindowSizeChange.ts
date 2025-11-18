@@ -7,7 +7,7 @@ export interface RenderAssetsOptions {
   worldHeight: number;
   terrainRef: React.MutableRefObject<Terrain>;
   canvasRef: React.MutableRefObject<HTMLCanvasElement | null>;
-  terrainPathRef: React.MutableRefObject<Path2D | null>;
+  terrainPathsRef: React.MutableRefObject<Path2D[]>; // Array of paths: [mainTerrain, ...islands]
   gradientRef: React.MutableRefObject<CanvasGradient | null>;
   starCanvasRef: React.MutableRefObject<HTMLCanvasElement | null>;
 }
@@ -16,19 +16,37 @@ export interface RenderAssetsOptions {
  * Prepares terrain path, gradient, and starfield canvas when window size or world dimensions change.
  */
 export function handleWindowSizeChange(options: RenderAssetsOptions) {
-  const { windowSize, worldWidth, worldHeight, terrainRef, canvasRef, terrainPathRef, gradientRef, starCanvasRef } = options;
+  const { windowSize, worldWidth, worldHeight, terrainRef, canvasRef, terrainPathsRef, gradientRef, starCanvasRef } = options;
   useEffect(() => {
-    // Terrain path
-    const path = new Path2D();
+    // Generate paths for all terrain polygons
+    const paths: Path2D[] = [];
     const terrain = terrainRef.current;
-    if (terrain.points.length > 0) {
-      path.moveTo(terrain.points[0].x, terrain.points[0].y);
-      for (let i = 1; i < terrain.points.length; i++) {
-        path.lineTo(terrain.points[i].x, terrain.points[i].y);
+    
+    // Main terrain path
+    const mainPath = new Path2D();
+    if (terrain.mainTerrain.points.length > 0) {
+      mainPath.moveTo(terrain.mainTerrain.points[0].x, terrain.mainTerrain.points[0].y);
+      for (let i = 1; i < terrain.mainTerrain.points.length; i++) {
+        mainPath.lineTo(terrain.mainTerrain.points[i].x, terrain.mainTerrain.points[i].y);
       }
-      path.closePath();
+      mainPath.closePath();
     }
-    terrainPathRef.current = path;
+    paths.push(mainPath);
+    
+    // Island paths
+    for (const island of terrain.islands) {
+      const islandPath = new Path2D();
+      if (island.points.length > 0) {
+        islandPath.moveTo(island.points[0].x, island.points[0].y);
+        for (let i = 1; i < island.points.length; i++) {
+          islandPath.lineTo(island.points[i].x, island.points[i].y);
+        }
+        islandPath.closePath();
+      }
+      paths.push(islandPath);
+    }
+    
+    terrainPathsRef.current = paths;
     // Starfield prerender
     const starCanvas = document.createElement('canvas');
     starCanvas.width = windowSize.width;

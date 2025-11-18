@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Spaceship, createInitialShip, drawExplosion } from '../../game/spaceship';
-import { Terrain } from '../../game/terrain';
+import { Terrain, findSafeSpawnPosition } from '../../game/terrain';
 import { handleShipTerrainCollision } from '../../game/collision';
 import { updateShip } from '../../game/spaceship';
 import { drawHUD } from '../../game/hud';
@@ -13,7 +13,7 @@ export interface GameLoopOptions {
   keysRef: React.MutableRefObject<{ up: boolean; left: boolean; right: boolean }>;
   terrainRef: React.MutableRefObject<Terrain>;
   starCanvasRef: React.MutableRefObject<HTMLCanvasElement | null>;
-  terrainPathRef: React.MutableRefObject<Path2D | null>;
+  terrainPathsRef: React.MutableRefObject<Path2D[]>;
   gradientRef: React.MutableRefObject<CanvasGradient | null>;
 }
 
@@ -30,7 +30,7 @@ export function useGameLoop(options: GameLoopOptions) {
     keysRef,
     terrainRef,
     starCanvasRef,
-    terrainPathRef,
+    terrainPathsRef,
     gradientRef,
   } = options;
   // Lazy refs so initialization is clearly one-time and not tied to renders.
@@ -38,11 +38,13 @@ export function useGameLoop(options: GameLoopOptions) {
   const prevShipPosRef = React.useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const accumulatorRef = React.useRef<number>(0);
   const lastTimeRef = React.useRef<number | null>(null);
+  const collisionCheckCounterRef = React.useRef<number>(0); // Throttle collision checks
 
   useEffect(() => {
     // Initialize ship once (keeps position stable across window resizes)
     if (!shipRef.current) {
-      shipRef.current = createInitialShip(worldWidth * 0.5, worldHeight * 0.5);
+      const safeSpawn = findSafeSpawnPosition(terrainRef.current, worldWidth, worldHeight);
+      shipRef.current = createInitialShip(safeSpawn.x, safeSpawn.y);
       prevShipPosRef.current.x = shipRef.current.x;
       prevShipPosRef.current.y = shipRef.current.y;
     }
@@ -65,12 +67,21 @@ export function useGameLoop(options: GameLoopOptions) {
       const offsetY = ctx.canvas.height * 0.5 - renderY;
       ctx.save();
       ctx.translate(offsetX, offsetY);
-      if (terrainPathRef.current) {
+      if (terrainPathsRef.current && terrainPathsRef.current.length > 0) {
+        // Draw main terrain (first path)
         ctx.fillStyle = gradientRef.current || '#1d3b4d';
-        ctx.fill(terrainPathRef.current);
+        ctx.fill(terrainPathsRef.current[0]);
         ctx.strokeStyle = '#3b6b8b';
         ctx.lineWidth = 3;
-        ctx.stroke(terrainPathRef.current);
+        ctx.stroke(terrainPathsRef.current[0]);
+        
+        // Draw islands (remaining paths)
+        ctx.fillStyle = '#2a4f5f'; // Slightly different color for islands
+        ctx.strokeStyle = '#4a7a8b';
+        for (let i = 1; i < terrainPathsRef.current.length; i++) {
+          ctx.fill(terrainPathsRef.current[i]);
+          ctx.stroke(terrainPathsRef.current[i]);
+        }
       }
       ctx.restore();
       
@@ -120,12 +131,17 @@ export function useGameLoop(options: GameLoopOptions) {
         prevShipPosRef.current.y = ship.y;
         updateShip(ship, FIXED_DT, keysRef.current);
         
-        // Handle terrain collision (explosion is triggered inside the function)
-        handleShipTerrainCollision(ship, terrainRef.current);
+        // Throttle collision detection - only check every 4th physics frame (30fps instead of 120fps)
+        collisionCheckCounterRef.current++;
+        if (collisionCheckCounterRef.current >= 4) {
+          collisionCheckCounterRef.current = 0;
+          handleShipTerrainCollision(ship, terrainRef.current);
+        }
         
         // Reset ship after explosion duration (3 seconds)
         if (ship.isExploded && ship.explosionTime >= 3) {
-          ship.reset(worldWidth * 0.5, worldHeight * 0.5);
+          const safeSpawn = findSafeSpawnPosition(terrainRef.current, worldWidth, worldHeight);
+          ship.reset(safeSpawn.x, safeSpawn.y);
         }
         
         accumulatorRef.current -= FIXED_DT;

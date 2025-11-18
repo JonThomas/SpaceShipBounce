@@ -6,10 +6,14 @@
 - If a file exists for a module, use its guidance for code generation
 - When changing the functionality of a module, update the corresponsing instruction file with rationale
 - If unsure, ask for clarification or add a TODO comment
+- Do not introduce changes that will degrade performance without explicitly asking first if the changes are acceptable
 
 ## General instructions
 - Prefer typescript files over javascript, and don't mix them
 - Don't create new empty files that might be useful in the future
+- Don't maintain any code just for backward compatibility 
+- Be firm when making choices: Avoid code that can provide different behaviors by changing the code itself
+- Always remove dead code, unused imports, and commented-out code blocks
 
 ## General Coding Style
 - Always use braces `{}` to contain logic within for loops

@@ -31,8 +31,8 @@ export interface Spaceship {
 export function createInitialShip(x: number, y: number): Spaceship {
   // Ship is initialized at world center and moves in world coordinates.
   const ship: Spaceship = {
-    x,
-    y,
+    x: 0,
+    y: 0,
     vx: 0,
     vy: 0,
     angle: 0,
@@ -98,7 +98,6 @@ interface KeysState { up: boolean; left: boolean; right: boolean; }
 const GRAVITY = 60; // px/s^2 downward
 const THRUST = 140; // acceleration magnitude px/s^2
 const ROT_SPEED = Math.PI; // radians per second
-
 const EXPLOSION_DURATION = 3; // seconds
 
 export function updateShip(ship: Spaceship, dt: number, keys: KeysState) {
@@ -154,7 +153,9 @@ export function updateShip(ship: Spaceship, dt: number, keys: KeysState) {
 
 // Render explosion particles
 export function drawExplosion(ctx: CanvasRenderingContext2D, ship: Spaceship, offsetX: number, offsetY: number) {
-  if (!ship.isExploded) return;
+  if (!ship.isExploded) {
+    return;
+  }
   
   ctx.save();
   

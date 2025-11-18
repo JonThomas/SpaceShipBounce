@@ -1,10 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Terrain, generateTerrain } from '../game/terrain';
+import { Terrain } from '../game/terrain';
+import { buildTerrain } from '../game/terrain-builder';
 import { handleWindowSizeChange, RenderAssetsOptions } from './hooks/handleWindowSizeChange';
 import { useGameLoop, GameLoopOptions } from './hooks/gameLoop';
-
-// No props needed, will use window size
-
 import { useKeyControls } from './hooks/useKeyControls';
 
 export const GameCanvas: React.FC = () => {
@@ -28,10 +26,10 @@ export const GameCanvas: React.FC = () => {
   const WORLD_WIDTH = windowSize.width * WORLD_SCALE;
   const WORLD_HEIGHT = windowSize.height * WORLD_SCALE;
 
-  // Initialize ship at center of world
-  const terrainRef = useRef<Terrain>(generateTerrain(WORLD_WIDTH, WORLD_HEIGHT));
+  // Initialize terrain using explicit default configuration
+  const terrainRef = useRef<Terrain>(buildTerrain(WORLD_WIDTH, WORLD_HEIGHT));
   const keysRef = useKeyControls();
-  const terrainPathRef = useRef<Path2D | null>(null);
+  const terrainPathsRef = useRef<Path2D[]>([]);
   const gradientRef = useRef<CanvasGradient | null>(null);
   const starCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -42,7 +40,7 @@ export const GameCanvas: React.FC = () => {
     worldHeight: WORLD_HEIGHT,
     terrainRef,
     canvasRef,
-    terrainPathRef,
+    terrainPathsRef,
     gradientRef,
     starCanvasRef
   };
@@ -57,7 +55,7 @@ export const GameCanvas: React.FC = () => {
     keysRef,
     terrainRef,
     starCanvasRef,
-    terrainPathRef,
+    terrainPathsRef,
     gradientRef
   };
   useGameLoop(gameLoopOptions);

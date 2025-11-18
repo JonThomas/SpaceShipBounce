@@ -6,11 +6,9 @@ A small React + Vite + TypeScript physics toy: pilot a tiny spacecraft under gra
 - Gravity-based motion
 - Thrust and rotation controls
 - Simple star field background
-- Procedural wavy terrain
-- Velocity + angle HUD
+- HUD that displays velocity, angle and speed
 
 ## Planned
-- Terrain collision + bounce mechanics
 - Parallax multi-layer landscape
 - Mobile/touch controls (optional)
 - Energy/fuel system (optional)
