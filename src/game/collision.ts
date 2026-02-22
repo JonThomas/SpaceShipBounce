@@ -1,7 +1,7 @@
 // Collision detection and response for spaceship and terrain
 // Separated from spaceship.ts for modularity and clarity per copilot-instructions.md
 
-import { Terrain, Point, TerrainPolygon } from './terrain';
+import { Terrain, Point, TerrainPolygon, Platform } from './terrain';
 import { Spaceship } from './spaceship';
 
 // Safe spawn position constants
@@ -173,11 +173,54 @@ export function findSafeSpawnPosition(terrain: Terrain, worldWidth: number, worl
   return { x: worldWidth * FALLBACK_CENTER_RATIO, y: worldHeight * FALLBACK_CENTER_RATIO };
 }
 
-// Handles collision detection and response for a spaceship against terrain
-// Now triggers explosion instead of bounce
+// Landing constants
+const LANDING_MAX_SPEED = 50; // px/s — maximum speed for a safe landing
+const LANDING_ANGLE_THRESHOLD = 0.85; // cos(~32°) — ship must be roughly upright relative to platform normal
+
+// Find the nearest platform whose surface is within collision distance of the ship
+export function findNearestPlatform(x: number, y: number, radius: number, platforms: Platform[]): Platform | null {
+  for (const platform of platforms) {
+    const dx = platform.p2.x - platform.p1.x;
+    const dy = platform.p2.y - platform.p1.y;
+    const segLenSq = dx * dx + dy * dy;
+    if (segLenSq === 0) {
+      continue;
+    }
+    let t = ((x - platform.p1.x) * dx + (y - platform.p1.y) * dy) / segLenSq;
+    if (t < 0) {
+      t = 0;
+    }
+    if (t > 1) {
+      t = 1;
+    }
+    const projX = platform.p1.x + dx * t;
+    const projY = platform.p1.y + dy * t;
+    const dist = Math.hypot(x - projX, y - projY);
+    if (dist < radius) {
+      return platform;
+    }
+  }
+  return null;
+}
+
+// Check if the ship can safely land: speed must be low and ship roughly upright relative to the platform normal
+export function canLandOnPlatform(ship: Spaceship, platform: Platform): boolean {
+  if (ship.currentSpeed > LANDING_MAX_SPEED) {
+    return false;
+  }
+  // Ship nose direction: angle 0 = up → (sin(angle), -cos(angle))
+  const shipUpX = Math.sin(ship.angle);
+  const shipUpY = -Math.cos(ship.angle);
+  // Ship is upright when its nose aligns with the platform's inward normal
+  const dot = shipUpX * platform.nx + shipUpY * platform.ny;
+  return dot > LANDING_ANGLE_THRESHOLD;
+}
+
+// Handles collision detection and response for a spaceship against terrain.
+// Checks for platform landing before triggering explosion.
 export function handleShipTerrainCollision(ship: Spaceship, terrain: Terrain): CollisionResult {
-  // Skip collision if ship is already exploded
-  if (ship.isExploded) {
+  // Skip collision if ship is already exploded or landed
+  if (ship.isExploded || ship.isLanded) {
     return { collided: false, exploded: false };
   }
 
@@ -185,7 +228,36 @@ export function handleShipTerrainCollision(ship: Spaceship, terrain: Terrain): C
     return { collided: false, exploded: false };
   }
 
-  // Collision detected - explode the ship
+  // Check if the collision is with a platform
+  const platform = findNearestPlatform(ship.x, ship.y, ship.radius, terrain.platforms);
+  if (platform && canLandOnPlatform(ship, platform)) {
+    // Successful landing — freeze ship on the platform surface
+    ship.isLanded = true;
+    ship.landedNx = platform.nx;
+    ship.landedNy = platform.ny;
+    ship.vx = 0;
+    ship.vy = 0;
+    ship.thrusting = false;
+    ship.currentSpeed = 0;
+
+    // Snap ship to platform surface offset by its radius along the normal
+    const dx = platform.p2.x - platform.p1.x;
+    const dy = platform.p2.y - platform.p1.y;
+    const segLenSq = dx * dx + dy * dy;
+    let t = ((ship.x - platform.p1.x) * dx + (ship.y - platform.p1.y) * dy) / segLenSq;
+    if (t < 0) {
+      t = 0;
+    }
+    if (t > 1) {
+      t = 1;
+    }
+    ship.x = platform.p1.x + dx * t + platform.nx * ship.radius;
+    ship.y = platform.p1.y + dy * t + platform.ny * ship.radius;
+
+    return { collided: true, exploded: false };
+  }
+
+  // Collision detected (regular terrain or failed landing) — explode the ship
   ship.explode();
   return { collided: true, exploded: true };
 }

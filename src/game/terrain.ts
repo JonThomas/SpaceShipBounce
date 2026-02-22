@@ -1,8 +1,15 @@
 export interface Point { x: number; y: number; }
 export interface TerrainPolygon { points: Point[]; } // Points define a closed non-self-intersecting polygon (CCW)
+export interface Platform {
+  p1: Point;  // Start endpoint of the landing surface (on terrain edge)
+  p2: Point;  // End endpoint of the landing surface (on terrain edge)
+  nx: number; // Normal x pointing into playable area
+  ny: number; // Normal y pointing into playable area
+}
 export interface Terrain { 
   mainTerrain: TerrainPolygon; // The outer boundary terrain
   islands: TerrainPolygon[]; // Array of island polygons within the main terrain
+  platforms: Platform[]; // Landing platforms on terrain edges
 }
 
 // Main terrain generation constants

@@ -20,6 +20,9 @@ export interface Spaceship {
   maxSpeed: number; // maximum speed magnitude for HUD scaling & gameplay
   currentSpeed: number; // cached speed magnitude after clamping each update
   isExploded: boolean;
+  isLanded: boolean;
+  landedNx: number; // Platform normal x (for takeoff direction)
+  landedNy: number; // Platform normal y (for takeoff direction)
   explosionTime: number;
   explosionParticles: ExplosionParticle[];
   setPositionAndVelocity: (x: number, y: number, vx: number, vy: number) => void;
@@ -41,6 +44,9 @@ export function createInitialShip(x: number, y: number): Spaceship {
     maxSpeed: 500,
     currentSpeed: 0,
     isExploded: false,
+    isLanded: false,
+    landedNx: 0,
+    landedNy: 0,
     explosionTime: 0,
     explosionParticles: [],
     setPositionAndVelocity: function (newX: number, newY: number, newVx: number, newVy: number) {
@@ -50,10 +56,11 @@ export function createInitialShip(x: number, y: number): Spaceship {
       this.vy = newVy;
     },
     shouldRenderFlame: function () {
-      return this.thrusting && this.currentSpeed < this.maxSpeed && !this.isExploded;
+      return this.thrusting && this.currentSpeed < this.maxSpeed && !this.isExploded && !this.isLanded;
     },
     explode: function () {
       this.isExploded = true;
+      this.isLanded = false;
       this.explosionTime = 0;
       this.thrusting = false;
       this.vx = 0;
@@ -86,6 +93,9 @@ export function createInitialShip(x: number, y: number): Spaceship {
       this.thrusting = false;
       this.currentSpeed = 0;
       this.isExploded = false;
+      this.isLanded = false;
+      this.landedNx = 0;
+      this.landedNy = 0;
       this.explosionTime = 0;
       this.explosionParticles = [];
     }
@@ -99,6 +109,7 @@ const GRAVITY = 60; // px/s^2 downward
 const THRUST = 400; // acceleration magnitude px/s^2
 const ROT_SPEED = Math.PI; // radians per second
 const EXPLOSION_DURATION = 3; // seconds
+const TAKEOFF_IMPULSE = 80; // px/s impulse along platform normal on takeoff
 
 export function updateShip(ship: Spaceship, dt: number, keys: KeysState) {
   // Handle explosion state
@@ -117,6 +128,16 @@ export function updateShip(ship: Spaceship, dt: number, keys: KeysState) {
     ship.explosionParticles = ship.explosionParticles.filter(p => p.life > 0);
     
     return; // Don't update ship physics when exploded
+  }
+
+  // Handle landed state — ship stays frozen until thrust
+  if (ship.isLanded) {
+    if (keys.up) {
+      ship.isLanded = false;
+      ship.vx = ship.landedNx * TAKEOFF_IMPULSE;
+      ship.vy = ship.landedNy * TAKEOFF_IMPULSE;
+    }
+    return;
   }
 
   // Handle rotation input

@@ -5,6 +5,7 @@ import { findSafeSpawnPosition } from '../../game/collision';
 import { handleShipTerrainCollision } from '../../game/collision';
 import { updateShip } from '../../game/spaceship';
 import { drawHUD } from '../../game/hud';
+import { drawPlatforms } from '../../game/platforms';
 
 export interface GameLoopOptions {
   windowSize: { width: number; height: number };
@@ -84,6 +85,8 @@ export function useGameLoop(options: GameLoopOptions) {
           ctx.stroke(terrainPathsRef.current[i]);
         }
       }
+      // Draw landing platforms (in world coordinates)
+      drawPlatforms(ctx, terrainRef.current.platforms);
       ctx.restore();
       
       // Render ship or explosion

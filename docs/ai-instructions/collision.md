@@ -26,6 +26,9 @@ The collision module handles all collision detection logic for the spaceship bou
 - Used by spaceship collision handling
 - Required for spawn position determination
 - Maintains terrain type imports for data structures only
+- Platform landing: `findNearestPlatform` checks if collision is with a platform segment,
+  `canLandOnPlatform` verifies speed and angle thresholds before allowing a safe landing
+  instead of triggering an explosion
 
 ## Rationale for Module Separation
 Moved collision logic from terrain.ts to collision.ts to:

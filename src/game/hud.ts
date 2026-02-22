@@ -43,5 +43,12 @@ export function drawHUD(ctx: CanvasRenderingContext2D, ship: Spaceship) {
   ctx.font = '12px monospace';
   ctx.fillText('Speed', barX + 4, barY + barHeight - 3);
 
+  // Landed indicator
+  if (ship.isLanded) {
+    ctx.fillStyle = '#39ff14';
+    ctx.font = '16px monospace';
+    ctx.fillText('LANDED', padding, barY + barHeight + 20);
+  }
+
   ctx.restore();
 }

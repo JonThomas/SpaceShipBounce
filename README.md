@@ -1,6 +1,6 @@
 # SpaceShip Bounce
 
-A small React + Vite + TypeScript physics toy: pilot a tiny spacecraft under gravity. Use **Arrow Up** for thrust (in the facing direction), **Arrow Left/Right** to rotate. Terrain generation and collision bouncing will be added.
+A physics game where you can pilot a tiny spacecraft under gravity. Use **Arrow Up** for thrust (in the facing direction), **Arrow Left/Right** to rotate.
 
 ## Features (current)
 - Gravity-based motion
@@ -18,6 +18,9 @@ A small React + Vite + TypeScript physics toy: pilot a tiny spacecraft under gra
 npm install
 npm run dev
 ```
+
+## Technology
+Written in React + Vite + TypeScript 
 
 ## TypeScript-Only Policy
 This project strictly uses TypeScript only - **NO JavaScript files allowed**.
