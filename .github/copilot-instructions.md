@@ -8,6 +8,14 @@
 - If unsure, ask for clarification or add a TODO comment
 - Do not introduce changes that will degrade performance without explicitly asking first if the changes are acceptable
 
+## CRITICAL: TypeScript-Only Policy
+- **NEVER create .js or .jsx files under any circumstances**
+- **ALWAYS use .ts for TypeScript files and .tsx for React components**
+- **IMMEDIATELY delete any .js files if found in the project**
+- **Verify no JavaScript files exist before completing any task**
+- Use `npm run build` to verify TypeScript compilation works
+- If you accidentally create a .js file, delete it immediately and recreate as .ts/.tsx
+
 ## General instructions
 - Prefer typescript files over javascript, and don't mix them
 - Don't create new empty files that might be useful in the future
