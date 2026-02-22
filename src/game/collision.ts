@@ -173,9 +173,23 @@ export function findSafeSpawnPosition(terrain: Terrain, worldWidth: number, worl
   return { x: worldWidth * FALLBACK_CENTER_RATIO, y: worldHeight * FALLBACK_CENTER_RATIO };
 }
 
-// Landing constants
-const LANDING_MAX_SPEED = 50; // px/s — maximum speed for a safe landing
-const LANDING_ANGLE_THRESHOLD = 0.85; // cos(~32°) — ship must be roughly upright relative to platform normal
+// Landing constants — tune these for difficulty.
+// Speed ratio: fraction of ship.maxSpeed allowed for safe landing (0.24 = 24%)
+const LANDING_SPEED_RATIO = 0.24;
+// Angle tolerance: max degrees off from platform perpendicular for safe landing
+const LANDING_ANGLE_TOLERANCE_DEG = 15;
+const LANDING_ANGLE_COS = Math.cos(LANDING_ANGLE_TOLERANCE_DEG * Math.PI / 180);
+// Proximity distance: ship-center to platform-center distance within which the visual cue activates
+export const LANDING_PROXIMITY_DISTANCE = 200;
+// Grace factor: collision check allows this fraction more speed than the indicator threshold
+// to prevent "green indicator but still explodes" due to gravity between render and collision frames
+const LANDING_COLLISION_GRACE = 1.15;
+
+// Landing assist constants
+const ASSIST_RANGE = 60; // px from platform surface where assists activate
+const ROTATION_ASSIST_RATE = 0.8; // radians/sec max rotational nudge
+const BRAKE_RANGE = 40; // px from platform surface where braking activates
+const BRAKE_FACTOR = 0.3; // fraction of approach speed to remove per second
 
 // Find the nearest platform whose surface is within collision distance of the ship
 export function findNearestPlatform(x: number, y: number, radius: number, platforms: Platform[]): Platform | null {
@@ -203,17 +217,30 @@ export function findNearestPlatform(x: number, y: number, radius: number, platfo
   return null;
 }
 
-// Check if the ship can safely land: speed must be low and ship roughly upright relative to the platform normal
-export function canLandOnPlatform(ship: Spaceship, platform: Platform): boolean {
-  if (ship.currentSpeed > LANDING_MAX_SPEED) {
+// Check if the ship can safely land: speed must be low and ship roughly upright relative to the platform normal.
+// graceFactor (default 1.0) multiplies the speed threshold — used by collision to add a buffer
+// so the indicator and collision agree even when gravity shifts speed between frames.
+export function canLandOnPlatform(ship: Spaceship, platform: Platform, graceFactor: number = 1.0): boolean {
+  // Speed check: impact speed must be within configured ratio of ship max speed (with optional grace)
+  const maxLandingSpeed = LANDING_SPEED_RATIO * ship.maxSpeed * graceFactor;
+  if (ship.currentSpeed > maxLandingSpeed) {
     return false;
   }
+  // Angle check: ship nose must be within ±LANDING_ANGLE_TOLERANCE_DEG of platform perpendicular
   // Ship nose direction: angle 0 = up → (sin(angle), -cos(angle))
   const shipUpX = Math.sin(ship.angle);
   const shipUpY = -Math.cos(ship.angle);
-  // Ship is upright when its nose aligns with the platform's inward normal
   const dot = shipUpX * platform.nx + shipUpY * platform.ny;
-  return dot > LANDING_ANGLE_THRESHOLD;
+  return dot > LANDING_ANGLE_COS;
+}
+
+// Check if the ship is within the cue-activation proximity of a platform.
+// Uses ship-center to platform-center (midpoint of p1–p2) distance.
+export function isShipNearPlatform(ship: Spaceship, platform: Platform): boolean {
+  const cx = (platform.p1.x + platform.p2.x) / 2;
+  const cy = (platform.p1.y + platform.p2.y) / 2;
+  const dist = Math.hypot(ship.x - cx, ship.y - cy);
+  return dist <= LANDING_PROXIMITY_DISTANCE;
 }
 
 // Handles collision detection and response for a spaceship against terrain.
@@ -228,9 +255,9 @@ export function handleShipTerrainCollision(ship: Spaceship, terrain: Terrain): C
     return { collided: false, exploded: false };
   }
 
-  // Check if the collision is with a platform
+  // Check if the collision is with a platform (use grace factor to prevent green-indicator-but-explodes)
   const platform = findNearestPlatform(ship.x, ship.y, ship.radius, terrain.platforms);
-  if (platform && canLandOnPlatform(ship, platform)) {
+  if (platform && canLandOnPlatform(ship, platform, LANDING_COLLISION_GRACE)) {
     // Successful landing — freeze ship on the platform surface
     ship.isLanded = true;
     ship.landedNx = platform.nx;
@@ -260,4 +287,76 @@ export function handleShipTerrainCollision(ship: Spaceship, terrain: Terrain): C
   // Collision detected (regular terrain or failed landing) — explode the ship
   ship.explode();
   return { collided: true, exploded: true };
+}
+
+// Apply gentle landing assists when the ship is near a platform.
+// Rotational nudge aligns ship to the platform normal; braking reduces approach speed.
+// Call after updateShip and before collision detection each physics frame.
+export function applyLandingAssists(ship: Spaceship, platforms: Platform[], dt: number): void {
+  if (ship.isExploded || ship.isLanded) {
+    return;
+  }
+
+  for (const platform of platforms) {
+    // Project ship onto platform segment to find distance to surface
+    const dx = platform.p2.x - platform.p1.x;
+    const dy = platform.p2.y - platform.p1.y;
+    const segLenSq = dx * dx + dy * dy;
+    if (segLenSq === 0) {
+      continue;
+    }
+    let t = ((ship.x - platform.p1.x) * dx + (ship.y - platform.p1.y) * dy) / segLenSq;
+    if (t < 0) {
+      t = 0;
+    }
+    if (t > 1) {
+      t = 1;
+    }
+    const projX = platform.p1.x + dx * t;
+    const projY = platform.p1.y + dy * t;
+    const dist = Math.hypot(ship.x - projX, ship.y - projY);
+
+    if (dist > ASSIST_RANGE) {
+      continue;
+    }
+
+    // Only assist if ship is on the correct side (in front of the platform, not behind)
+    const toShipX = ship.x - projX;
+    const toShipY = ship.y - projY;
+    const sideCheck = toShipX * platform.nx + toShipY * platform.ny;
+    if (sideCheck < 0) {
+      continue;
+    }
+
+    // Strength ramps up as ship gets closer (0 at edge, 1 at surface)
+    const strength = 1 - dist / ASSIST_RANGE;
+
+    // Rotational assist: gently nudge ship angle toward platform normal
+    const targetAngle = Math.atan2(platform.nx, -platform.ny);
+    let angleDiff = targetAngle - ship.angle;
+    // Normalize to [-π, π]
+    while (angleDiff > Math.PI) {
+      angleDiff -= 2 * Math.PI;
+    }
+    while (angleDiff < -Math.PI) {
+      angleDiff += 2 * Math.PI;
+    }
+    ship.angle += angleDiff * strength * ROTATION_ASSIST_RATE * dt;
+
+    // Speed braking: reduce approach speed when very close and moving toward platform
+    if (dist < BRAKE_RANGE) {
+      const approachSpeed = -(ship.vx * platform.nx + ship.vy * platform.ny);
+      if (approachSpeed > 0) {
+        const brakeStrength = 1 - dist / BRAKE_RANGE;
+        const brakeAmount = approachSpeed * BRAKE_FACTOR * brakeStrength * dt;
+        ship.vx += platform.nx * brakeAmount;
+        ship.vy += platform.ny * brakeAmount;
+        // Recalculate cached speed after braking
+        ship.currentSpeed = Math.hypot(ship.vx, ship.vy);
+      }
+    }
+
+    // Only assist with the nearest qualifying platform
+    break;
+  }
 }

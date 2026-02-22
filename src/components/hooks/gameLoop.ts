@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { Spaceship, createInitialShip, drawExplosion } from '../../game/spaceship';
 import { Terrain } from '../../game/terrain';
 import { findSafeSpawnPosition } from '../../game/collision';
-import { handleShipTerrainCollision } from '../../game/collision';
+import { handleShipTerrainCollision, applyLandingAssists } from '../../game/collision';
 import { updateShip } from '../../game/spaceship';
 import { drawHUD } from '../../game/hud';
 import { drawPlatforms } from '../../game/platforms';
@@ -86,7 +86,7 @@ export function useGameLoop(options: GameLoopOptions) {
         }
       }
       // Draw landing platforms (in world coordinates)
-      drawPlatforms(ctx, terrainRef.current.platforms);
+      drawPlatforms(ctx, terrainRef.current.platforms, ship);
       ctx.restore();
       
       // Render ship or explosion
@@ -134,6 +134,7 @@ export function useGameLoop(options: GameLoopOptions) {
         prevShipPosRef.current.x = ship.x;
         prevShipPosRef.current.y = ship.y;
         updateShip(ship, FIXED_DT, keysRef.current);
+        applyLandingAssists(ship, terrainRef.current.platforms, FIXED_DT);
         
         // Throttle collision detection - only check every 4th physics frame (30fps instead of 120fps)
         collisionCheckCounterRef.current++;

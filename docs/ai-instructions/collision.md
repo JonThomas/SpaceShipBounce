@@ -29,6 +29,11 @@ The collision module handles all collision detection logic for the spaceship bou
 - Platform landing: `findNearestPlatform` checks if collision is with a platform segment,
   `canLandOnPlatform` verifies speed and angle thresholds before allowing a safe landing
   instead of triggering an explosion
+- Landing constants are ratio-based: speed = LANDING_SPEED_RATIO × ship.maxSpeed, angle = ±LANDING_ANGLE_TOLERANCE_DEG from perpendicular
+- Collision uses LANDING_COLLISION_GRACE (1.15×) on speed check to prevent green-indicator-but-explodes bug caused by gravity between render and collision frames
+- `applyLandingAssists` provides gentle rotational nudge and speed braking when ship is near a platform (within ASSIST_RANGE=60px), called every physics frame from the game loop
+- `isShipNearPlatform` exported for visual cue proximity checks in platforms.ts
+- LANDING_PROXIMITY_DISTANCE exported as the cue-activation threshold
 
 ## Rationale for Module Separation
 Moved collision logic from terrain.ts to collision.ts to:

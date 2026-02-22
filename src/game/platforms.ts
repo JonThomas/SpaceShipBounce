@@ -1,4 +1,6 @@
 import { Point, TerrainPolygon, Terrain, Platform } from './terrain';
+import { Spaceship } from './spaceship';
+import { canLandOnPlatform, isShipNearPlatform } from './collision';
 
 // Platform segment indices on main terrain (160 segments, CCW)
 // Bottom area: theta ≈ π/2 at i=40
@@ -18,6 +20,11 @@ const PLATFORM_PAD_THICKNESS = 8;
 const PLATFORM_FILL_COLOR = '#1a3a1a';
 const PLATFORM_BORDER_COLOR = '#39ff14';
 const PLATFORM_BORDER_WIDTH = 2;
+
+// Visual cue colors for safe-landing indicator
+const PLATFORM_SAFE_COLOR = '#39ff14';   // Green — safe to land
+const PLATFORM_UNSAFE_COLOR = '#ff3333'; // Red — not safe to land
+const PLATFORM_CUE_BORDER_WIDTH = 3;     // Slightly thicker border when cue is active
 
 // Compute outward normal for a segment (same formula as collision.ts, duplicated to avoid circular import)
 function computeNormal(a: Point, b: Point): { nx: number; ny: number } {
@@ -72,9 +79,13 @@ export function generatePlatforms(terrain: Terrain): Platform[] {
 }
 
 // Draw platform pads as filled rectangles extruded from the terrain edge into the playable area
-export function drawPlatforms(ctx: CanvasRenderingContext2D, platforms: Platform[]) {
+export function drawPlatforms(ctx: CanvasRenderingContext2D, platforms: Platform[], ship: Spaceship) {
   for (const platform of platforms) {
     const { p1, p2, nx, ny } = platform;
+
+    // Determine visual cue state: only show when ship is nearby and not landed/exploded
+    const showCue = !ship.isExploded && !ship.isLanded && isShipNearPlatform(ship, platform);
+    const isSafe = showCue && canLandOnPlatform(ship, platform);
 
     ctx.beginPath();
     ctx.moveTo(p1.x, p1.y);
@@ -85,8 +96,16 @@ export function drawPlatforms(ctx: CanvasRenderingContext2D, platforms: Platform
 
     ctx.fillStyle = PLATFORM_FILL_COLOR;
     ctx.fill();
-    ctx.strokeStyle = PLATFORM_BORDER_COLOR;
-    ctx.lineWidth = PLATFORM_BORDER_WIDTH;
+
+    if (showCue) {
+      // Binary cue: green border = speed AND angle both safe; red = at least one unsafe
+      ctx.strokeStyle = isSafe ? PLATFORM_SAFE_COLOR : PLATFORM_UNSAFE_COLOR;
+      ctx.lineWidth = PLATFORM_CUE_BORDER_WIDTH;
+    } else {
+      // Default static appearance when ship is far away
+      ctx.strokeStyle = PLATFORM_BORDER_COLOR;
+      ctx.lineWidth = PLATFORM_BORDER_WIDTH;
+    }
     ctx.stroke();
   }
 }
